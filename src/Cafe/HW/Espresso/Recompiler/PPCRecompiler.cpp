@@ -23,6 +23,7 @@
 #include "util/CemuProfiling.h"
 #include "util/CemuThreadWatchdog.h"
 #include "util/CemuDiagV2.h"
+#include "Cafe/HW/Espresso/Analyzer/PPCPreExecutionAnalyzer.h"
 
 #define PPCREC_FORCE_SYNCHRONOUS_COMPILATION	0 // if 1, then function recompilation will block and execute on the thread that called PPCRecompiler_visitAddressNoBlock
 #define PPCREC_LOG_RECOMPILATION_RESULTS		0
@@ -199,6 +200,17 @@ bool PPCRecompiler_ApplyIMLPasses(ppcImlGenContext_t& ppcImlGenContext);
 
 PPCRecFunction_t* PPCRecompiler_recompileFunction(PPCFunctionBoundaryTracker::PPCRange_t range, std::set<uint32>& entryAddresses, std::vector<std::pair<MPTR, uint32>>& entryPointsOut, PPCFunctionBoundaryTracker& boundaryTracker)
 {
+	// --- FASE 2: JIT PRE-EXECUTION LOOKUP ---
+	// Se l'analizzatore conosce questa funzione e abbiamo troppi segmenti, blocchiamo il JIT per evitare lag spikes.
+	PPCPreExecutionAnalyzer::InstructionMetadata meta;
+	if (PPCPreExecutionAnalyzer::Lookup(range.startAddress, meta)) {
+		// Se la funzione è enorme (la dimensione dell'opcode non basta, ma possiamo usare la lunghezza del range)
+		if (range.length > 10000) { // 1000 * 4 bytes = 4KB di codice (blocco enorme)
+			cemuLog_log(LogType::Force, "[ANALYZER] Function 0x{:08X} is too large. Skipping JIT compilation to prevent lag spike.", range.startAddress);
+			return nullptr; // Forza l'uso dell'Interpreter per questo blocco
+		}
+	}
+	// ----------------------------------------
 #if CEMU_THREAD_WATCHDOG
     CemuWatchdog::Touch(CemuWatchdog::Recompiler, CemuWatchdog::Compile);
 #endif

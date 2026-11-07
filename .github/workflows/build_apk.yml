@@ -35,8 +35,9 @@ jobs:
           sed -i 's/applicationId "info.cemu.cemu"/applicationId "com.cemu.aimod.debug"/' app/build.gradle.kts 2>/dev/null || true
           sed -i 's/applicationId "info.cemu.cemu"/applicationId "com.cemu.aimod.debug"/' app/build.gradle 2>/dev/null || true
           
+          # Limita la RAM a 4GB e usa 2 worker (evita OOM di GitHub)
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug -Dorg.gradle.jvmargs="-Xmx4g" -Dorg.gradle.workers.max=2
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
