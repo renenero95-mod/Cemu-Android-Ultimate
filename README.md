@@ -1,14 +1,27 @@
-# **Cemu - Android Port (Wii U Emulator)**
+# Cemu+ Inspection
 
-This is the Android port of **Cemu**, a Wii U emulator written in C/C++.
-It is still early and experimental. Stability, performance, and features are not guaranteed, and some functionality may be missing compared to the desktop version.
+Cemu+ Inspection è un progetto di analisi e miglioramento tecnico di Cemu per Android, pensato per studiare il funzionamento interno dell'emulatore e individuare possibili ottimizzazioni in termini di prestazioni, compatibilità e stabilità.
 
-There is no timeline for when this port will be finished or when new features will be implemented.
+Il progetto introduce un sistema di PPC Pre-Execution Analysis: un analizzatore che esamina il codice PowerPC dei giochi durante il caricamento, prima della sua esecuzione, raccogliendo informazioni sulle istruzioni e organizzandole in una cache consultabile.
 
-**Please do not open issues or pull requests yet.**
-Development is ongoing, and contributions will be welcome once the project is more stable.
+### Obiettivi principali
 
-For general information about Cemu, see the [official website](https://cemu.info) and [main repository](https://github.com/cemu-project/Cemu).
+- Analizzare preventivamente le sezioni di codice PowerPC eseguibili.
+- Identificare le istruzioni supportate, non supportate o da approfondire.
+- Creare una cache dei risultati per evitare analisi ripetute.
+- Fornire informazioni utili per migliorare interpreter e JIT.
+- Individuare potenziali problemi di compatibilità e stabilità.
+- Misurare i miglioramenti con test e benchmark reali.
 
-## License
-Cemu is licensed under [Mozilla Public License 2.0](/LICENSE.txt). Exempt from this are all files in the dependencies directory for which the licenses of the original code apply as well as some individual files in the src folder, as specified in those file headers respectively.
+### Come funziona
+
+1. Cemu carica normalmente il gioco.
+2. L'Inspector individua le sezioni contenenti codice eseguibile.
+3. Analizza le istruzioni PowerPC senza eseguirle.
+4. Registra i risultati in una struttura indicizzata per indirizzo.
+5. Salva i metadati in una cache associata al gioco e alla versione del sistema di analisi.
+6. Le informazioni potranno essere consultate dai componenti dell'emulatore, mantenendo il comportamento originale come fallback.
+
+### Filosofia del progetto
+
+La priorità è migliorare Cemu senza compromettere la correttezza dell'emulazione. L'analisi iniziale sarà passiva: nessuna istruzione verrà modificata o saltata automaticamente. Eventuali ottimizzazioni saranno introdotte solo dopo verifiche tecniche e benchmark.
