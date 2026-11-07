@@ -537,6 +537,7 @@ add_library(CemuCafe
   TitleList/TitleInfo.h
   TitleList/TitleList.cpp
   TitleList/TitleList.h
+    HW/Espresso/Analyzer/PPCPreExecutionAnalyzer.cpp
 )
 
 if(APPLE)
