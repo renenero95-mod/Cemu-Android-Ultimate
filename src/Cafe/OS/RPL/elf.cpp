@@ -1,3 +1,4 @@
+#include "Cafe/HW/Espresso/Analyzer/PPCPreExecutionAnalyzer.h"
 #include <zlib.h>
 #include "Cafe/OS/RPL/rpl.h"
 #include "Cafe/OS/RPL/rpl_structs.h"
@@ -72,16 +73,7 @@ uint32 ELF_LoadFromMemory(uint8* elfData, sint32 size, const char* name)
 		uint32 shSize = (uint32)sectionTable[i].shSize;
 		uint32 shOffset = (uint32)sectionTable[i].shOffset;
 
-		// --- PPC PRE-EXECUTION ANALYZER HOOK ---
-		if ((sectionTable[i].shFlags & 0x00000004) && (sectionTable[i].shType != 0x00000008) && shSize > 0) {
-			PPCPreExecutionAnalyzer::ScanExecutableSection(
-				shAddr,
-				(const uint8_t*)(elfData + shOffset),
-				shSize,
-				"ELF"
-			);
-		}
-		// ---------------------------------------
+		
 		uint32 shType = (uint32)sectionTable[i].shType;
 		uint32 shFlags = (uint32)sectionTable[i].shFlags;
 
@@ -90,6 +82,11 @@ uint32 ELF_LoadFromMemory(uint8* elfData, sint32 size, const char* name)
 			cemuLog_log(LogType::Force, "ELF section {} out of bounds", i);
 			continue;
 		}
+	// --- PPC PRE-EXECUTION ANALYZER HOOK ---
+	if ((sectionTable[i].shFlags & 0x00000004) && (sectionTable[i].shType != 0x00000008) && shSize > 0) {
+		PPCPreExecutionAnalyzer::ScanExecutableSection(shAddr, (const uint8_t*)(elfData + shOffset), shSize, "ELF");
+	}
+	// ---------------------------------------
 		uint32 copySize = std::min(shSize, size - shOffset);
 
 		// 0x00802000
