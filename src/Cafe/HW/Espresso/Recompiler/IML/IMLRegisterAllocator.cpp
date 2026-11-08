@@ -1740,8 +1740,11 @@ void IMLRA_MergeCloseAbstractRanges(IMLRegisterAllocatorContext& ctx)
 		if (rootMs >= 10)
 		{
 			cemuLog_log(LogType::Force,
-				"[REGALLOC FLOW ROOT] pc={:08x} ms={} visits={} checks={} calls={} edges={} maxDepth={}",
-				imlSegment->ppcAddress, rootMs,
+				"[REGALLOC FLOW ROOT] idx={} pc={:08x} enterable={} enterPC={:08x} instructions={} ranges={} ms={} visits={} checks={} calls={} edges={} maxDepth={}",
+				imlSegment->momentaryIndex, imlSegment->ppcAddress,
+				imlSegment->isEnterable, imlSegment->enterPPCAddress,
+				imlSegment->imlList.size(),
+				ctx.GetSegmentAbstractRangeMap(imlSegment).size(), rootMs,
 				ctx.flowSegmentVisits - visitsBefore,
 				ctx.flowRangeChecks - checksBefore,
 				ctx.flowRecursiveCalls - callsBefore,
