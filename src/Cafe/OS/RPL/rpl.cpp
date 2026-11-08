@@ -32,6 +32,7 @@ public:
 		uint32 allocSize = getAllocationSizeFromAddr(addr);
 		MPTR ppcAddr = memory_getVirtualOffsetFromPointer(addr);
 		PPCRecompiler_invalidateRange(ppcAddr, ppcAddr + allocSize);
+		PPCPreExecutionAnalyzer::InvalidateRange(ppcAddr, ppcAddr + allocSize);
 		VHeap::free(addr);
 	}
 };
@@ -1682,12 +1683,28 @@ RPLModule* RPLLoader_LoadFromMemory(uint8* rplData, sint32 size, std::string_vie
 
 void RPLLoader_FlushMemory(RPLModule* rpl)
 {
-	// invalidate recompiler cache
-	PPCRecompiler_invalidateRange(rpl->regionMappingBase_text.GetMPTR(), rpl->regionMappingBase_text.GetMPTR() + rpl->regionSize_text);
+	// invalidate recompiler cache and matching pre-execution metadata
+	uint32 textStart = rpl->regionMappingBase_text.GetMPTR();
+	uint32 textEnd = textStart + rpl->regionSize_text;
+	PPCRecompiler_invalidateRange(textStart, textEnd);
+	PPCPreExecutionAnalyzer::InvalidateRange(textStart, textEnd);
+	// Relocations may have changed instruction words; rebuild metadata from
+	// the final mapped text after invalidating entries collected at section load.
+	if (rpl->regionSize_text > 0)
+	{
+		PPCPreExecutionAnalyzer::ScanExecutableSection(
+			textStart,
+			static_cast<const uint8_t*>(memory_getPointerFromVirtualOffset(textStart)),
+			rpl->regionSize_text,
+			"RPL");
+	}
 	rpl->heapTrampolineArea.forEachBlock([](void* mem, uint32 size)
 	{
 		MEMPTR<void> memVirtual = mem;
-		PPCRecompiler_invalidateRange(memVirtual.GetMPTR(), memVirtual.GetMPTR() + size);
+		uint32 start = memVirtual.GetMPTR();
+		uint32 end = start + size;
+		PPCRecompiler_invalidateRange(start, end);
+		PPCPreExecutionAnalyzer::InvalidateRange(start, end);
 	});
 }
 

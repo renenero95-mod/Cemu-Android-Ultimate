@@ -22,7 +22,8 @@ namespace PPCPreExecutionAnalyzer {
     void InvalidateRange(uint32_t guestStart, uint32_t guestEnd) {
         std::unique_lock lock(s_dbMutex);
         for (auto it = s_db.begin(); it != s_db.end(); ) {
-            if (it->first >= guestStart && it->first <= guestEnd) it = s_db.erase(it);
+            // Match PPCRecompiler_invalidateRange(): [guestStart, guestEnd).
+            if (it->first >= guestStart && it->first < guestEnd) it = s_db.erase(it);
             else ++it;
         }
     }

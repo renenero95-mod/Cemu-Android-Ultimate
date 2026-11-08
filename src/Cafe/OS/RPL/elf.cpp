@@ -82,12 +82,17 @@ uint32 ELF_LoadFromMemory(uint8* elfData, sint32 size, const char* name)
 			cemuLog_log(LogType::Force, "ELF section {} out of bounds", i);
 			continue;
 		}
-	// --- PPC PRE-EXECUTION ANALYZER HOOK ---
-	if ((sectionTable[i].shFlags & 0x00000004) && (sectionTable[i].shType != 0x00000008) && shSize > 0) {
-		PPCPreExecutionAnalyzer::ScanExecutableSection(shAddr, (const uint8_t*)(elfData + shOffset), shSize, "ELF");
-	}
-	// ---------------------------------------
-		uint32 copySize = std::min(shSize, size - shOffset);
+		uint32 copySize = std::min(shSize, (uint32)size - shOffset);
+
+		// --- PPC PRE-EXECUTION ANALYZER HOOK ---
+		// Scan only bytes that are actually present in the ELF input buffer.
+		// The normal section copy below uses the same bounded length.
+		if ((shFlags & PF_X) && shType != SHT_NOBITS && copySize > 0)
+		{
+			PPCPreExecutionAnalyzer::ScanExecutableSection(
+				shAddr, (const uint8_t*)(elfData + shOffset), copySize, "ELF");
+		}
+		// ---------------------------------------
 
 		// 0x00802000
 		if (shAddr != 0)
