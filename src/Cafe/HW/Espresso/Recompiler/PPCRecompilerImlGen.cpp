@@ -2325,7 +2325,8 @@ bool PPCRecompiler_decodePPCInstruction(ppcImlGenContext_t* ppcImlGenContext)
 				unsupportedInstructionFound = true;
 			break;
 		case 54:
-			// DBCST - Generates no code
+			// DCBST must run through the interpreter to notify the GPU buffer cache.
+			unsupportedInstructionFound = true;
 			break;
 		case 55: // LWZUX
 			PPCRecompilerImlGen_LOAD_INDEXED(ppcImlGenContext, opcode, 32, false, true, true);
@@ -2339,7 +2340,8 @@ bool PPCRecompiler_decodePPCInstruction(ppcImlGenContext_t* ppcImlGenContext)
 				unsupportedInstructionFound = true;
 			break;
 		case 86:
-			// DCBF -> No-Op
+			// DCBF must run through the interpreter to notify the GPU buffer cache.
+			unsupportedInstructionFound = true;
 			break;
 		case 87: // LBZX
 			PPCRecompilerImlGen_LOAD_INDEXED(ppcImlGenContext, opcode, 8, false, true, false);
