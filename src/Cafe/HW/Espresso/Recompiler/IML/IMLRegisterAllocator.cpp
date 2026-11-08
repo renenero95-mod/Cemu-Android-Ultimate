@@ -44,6 +44,13 @@ struct IMLRegisterAllocatorContext
 	// first pass
 	std::vector<std::unordered_map<IMLRegID, IMLRARegAbstractLiveness>> perSegmentAbstractRanges;
 
+	// Temporary per-allocation counters for flow diagnostics.
+	size_t flowRecursiveCalls{ 0 };
+	size_t flowBranchEdges{ 0 };
+	size_t flowRangeChecks{ 0 };
+	size_t flowSegmentVisits{ 0 };
+	sint32 flowMaxDepth{ 0 };
+
 	// helper methods
 	inline std::unordered_map<IMLRegID, IMLRARegAbstractLiveness>& GetSegmentAbstractRangeMap(IMLSegment* imlSegment)
 	{
@@ -1587,6 +1594,8 @@ void IMLRA_connectAbstractRanges(IMLRegisterAllocatorContext& ctx, IMLRegID regI
 
 void _IMLRA_checkAndTryExtendRange(IMLRegisterAllocatorContext& ctx, IMLSegment* currentSegment, IMLRegID regID, sint32 distanceLeft, IMLSegment** route, sint32 routeDepth)
 {
+	ctx.flowRecursiveCalls++;
+	ctx.flowMaxDepth = std::max(ctx.flowMaxDepth, routeDepth);
 	if (routeDepth >= 64)
 	{
 		cemuLog_logDebug(LogType::Force, "Recompiler RA route maximum depth exceeded\n");
@@ -1603,9 +1612,15 @@ void _IMLRA_checkAndTryExtendRange(IMLRegisterAllocatorContext& ctx, IMLSegment*
 		if (distanceLeft > 0)
 		{
 			if (currentSegment->nextSegmentBranchNotTaken)
+			{
+				ctx.flowBranchEdges++;
 				_IMLRA_checkAndTryExtendRange(ctx, currentSegment->nextSegmentBranchNotTaken, regID, distanceLeft, route, routeDepth + 1);
+			}
 			if (currentSegment->nextSegmentBranchTaken)
+			{
+				ctx.flowBranchEdges++;
 				_IMLRA_checkAndTryExtendRange(ctx, currentSegment->nextSegmentBranchTaken, regID, distanceLeft, route, routeDepth + 1);
+			}
 		}
 		return;
 	}
@@ -1626,6 +1641,7 @@ void _IMLRA_checkAndTryExtendRange(IMLRegisterAllocatorContext& ctx, IMLSegment*
 
 void PPCRecRA_checkAndTryExtendRange(IMLRegisterAllocatorContext& ctx, IMLSegment* currentSegment, IMLRARegAbstractLiveness* range, IMLRegID regID)
 {
+	ctx.flowRangeChecks++;
 	cemu_assert_debug(range->usageEnd >= 0);
 	// count instructions to end of initial segment
 	sint32 instructionsUntilEndOfSeg;
@@ -1682,6 +1698,7 @@ void PPCRecRA_followFlowAndExtendRanges(IMLRegisterAllocatorContext& ctx, IMLSeg
 	while (index < list_segments.size())
 	{
 		IMLSegment* currentSegment = list_segments[index];
+		ctx.flowSegmentVisits++;
 		PPCRecRA_mergeCloseRangesForSegmentV2(ctx, currentSegment);
 		// follow flow
 		if (currentSegment->nextSegmentBranchNotTaken && !isSegProcessed(currentSegment->nextSegmentBranchNotTaken))
@@ -1703,15 +1720,44 @@ void IMLRA_MergeCloseAbstractRanges(IMLRegisterAllocatorContext& ctx)
 	size_t segmentCount = ctx.deprGenContext->segmentList2.size();
 	if (segmentCount > 600) { cemuLog_log(LogType::Force, "[MERGE CAP] skip ({} segments)", segmentCount); return; }
 	auto startT = std::chrono::steady_clock::now();
+	size_t rootCount = 0;
 	for (size_t s = 0; s < segmentCount; s++)
 	{
 		IMLSegment* imlSegment = ctx.deprGenContext->segmentList2[s];
 		if (!imlSegment->list_prevSegments.empty())
 			continue; // not an entry/standalone segment
+
+		const auto rootStart = std::chrono::steady_clock::now();
+		const size_t callsBefore = ctx.flowRecursiveCalls;
+		const size_t edgesBefore = ctx.flowBranchEdges;
+		const size_t checksBefore = ctx.flowRangeChecks;
+		const size_t visitsBefore = ctx.flowSegmentVisits;
 		PPCRecRA_followFlowAndExtendRanges(ctx, imlSegment);
+		rootCount++;
+
+		const auto rootMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - rootStart).count();
+		if (rootMs >= 10)
+		{
+			cemuLog_log(LogType::Force,
+				"[REGALLOC FLOW ROOT] pc={:08x} ms={} visits={} checks={} calls={} edges={} maxDepth={}",
+				imlSegment->ppcAddress, rootMs,
+				ctx.flowSegmentVisits - visitsBefore,
+				ctx.flowRangeChecks - checksBefore,
+				ctx.flowRecursiveCalls - callsBefore,
+				ctx.flowBranchEdges - edgesBefore,
+				ctx.flowMaxDepth);
+		}
 	}
 
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startT).count();
+	if (ms > 10)
+	{
+		cemuLog_log(LogType::Force,
+			"[REGALLOC FLOW TOTAL] ms={} roots={} segments={} visits={} checks={} calls={} edges={} maxDepth={}",
+			ms, rootCount, segmentCount, ctx.flowSegmentVisits, ctx.flowRangeChecks,
+			ctx.flowRecursiveCalls, ctx.flowBranchEdges, ctx.flowMaxDepth);
+	}
 	if (ms > 100)
 		cemuLog_log(LogType::Force, "[MERGE SLOW] {}ms ({} segments)", ms, ctx.deprGenContext->segmentList2.size());
 }
