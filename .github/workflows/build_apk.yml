@@ -1,21 +1,29 @@
 name: Build Cemu Android APK
+
 on:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: android-actions/setup-android@v3
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          cmdline-tools-version: latest
 
       - name: Install Android SDK and NDK
         run: |
@@ -29,7 +37,8 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx4g" -Dorg.gradle.workers.max=2
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: Cemu-Android-APK
           path: src/android/app/build/outputs/apk/debug/*.apk
