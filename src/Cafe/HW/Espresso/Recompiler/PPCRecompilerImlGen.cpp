@@ -949,6 +949,11 @@ bool PPCRecompilerImlGen_SUBFZE(ppcImlGenContext_t* ppcImlGenContext, uint32 opc
 bool PPCRecompilerImlGen_SUBFME(ppcImlGenContext_t* ppcImlGenContext, uint32 opcode)
 {
 	// d = ~a + 0xFFFFFFFF + CA; update XER[CA].
+	// OE=1 also requires XER[OV/SO] updates. Until the recompiler
+	// implements those flags, fall back to the interpreter for correctness.
+	if (opcode & PPC_OPC_OE)
+		return false;
+
 	sint32 rD, rA, rB;
 	PPC_OPC_TEMPL_XO(opcode, rD, rA, rB);
 	IMLReg regA = _GetRegGPR(ppcImlGenContext, rA);
