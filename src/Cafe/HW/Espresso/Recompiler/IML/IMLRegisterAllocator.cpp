@@ -1247,6 +1247,20 @@ bool IMLRA_AssignSegmentRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenCon
 
 void IMLRA_AssignRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenContext_t* ppcImlGenContext)
 {
+	// Diagnostic-only counters. These observe allocator restarts without changing decisions.
+	size_t assignPasses = 0;
+	size_t assignRetries = 0;
+	size_t totalInstructions = 0;
+	size_t totalRanges = 0;
+	size_t maxSegmentInstructions = 0;
+	for (IMLSegment* segIt : ppcImlGenContext->segmentList2)
+	{
+		totalInstructions += segIt->imlList.size();
+		maxSegmentInstructions = std::max(maxSegmentInstructions, segIt->imlList.size());
+		for (raLivenessRange* rangeIt = segIt->raInfo.linkedList_allSubranges; rangeIt; rangeIt = rangeIt->link_allSegmentRanges.next)
+			++totalRanges;
+	}
+
 	// start with frequently executed segments first
 	sint32 maxLoopDepth = 0;
 	for (IMLSegment* segIt : ppcImlGenContext->segmentList2)
@@ -1275,6 +1289,7 @@ void IMLRA_AssignRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenContext_t*
 
 	while (true)
 	{
+		++assignPasses;
 		bool done = false;
 		for (sint32 d = maxLoopDepth; d >= 0; d--)
 		{
@@ -1284,13 +1299,29 @@ void IMLRA_AssignRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenContext_t*
 					continue;
 				done = IMLRA_AssignSegmentRegisters(ctx, ppcImlGenContext, segIt);
 				if (done == false)
+				{
+					++assignRetries;
 					break;
+				}
 			}
 			if (done == false)
 				break;
 		}
 		if (done)
 			break;
+	}
+
+	if (assignRetries > 0)
+	{
+		cemuLog_log(LogType::Force,
+			"[REGALLOC RETRY] pc=0x{:08X} segments={} iml={} ranges={} max_seg={} passes={} retries={}",
+			ppcImlGenContext->debug_entryPPCAddress,
+			ppcImlGenContext->segmentList2.size(),
+			totalInstructions,
+			totalRanges,
+			maxSegmentInstructions,
+			assignPasses,
+			assignRetries);
 	}
 }
 
