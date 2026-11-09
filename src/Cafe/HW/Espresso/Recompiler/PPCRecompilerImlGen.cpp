@@ -3299,12 +3299,27 @@ bool PPCRecompiler_generateIntermediateCode(ppcImlGenContext_t& ppcImlGenContext
 	if (!PPCRecompiler_GenerateIML(ppcImlGenContext, boundaryTracker, entryAddresses))
 		return false;
 
-	// set range
-	// todo - support non-continuous functions for the range tracking?
-	ppcRecRange_t recRange;
-	recRange.ppcAddress = ppcRecFunc->ppcAddress;
-	recRange.ppcSize = ppcRecFunc->ppcSize;
-	ppcRecFunc->list_ranges.push_back(recRange);
+	// Register every PPC range translated into this native function.
+	// The IML generator processes all ranges discovered by boundaryTracker,
+	// not only the range containing the initial entry point.
+	for (const auto& boundaryRange : boundaryTracker.GetRanges())
+	{
+		if (boundaryRange.length == 0)
+			continue;
+
+		ppcRecRange_t recRange{};
+		recRange.ppcAddress = boundaryRange.startAddress;
+		recRange.ppcSize = boundaryRange.length;
+		recRange.storedRange = nullptr;
+		ppcRecFunc->list_ranges.emplace_back(recRange);
+	}
+
+	if (ppcRecFunc->list_ranges.empty())
+		return false;
+
+	if (ppcRecFunc->list_ranges.size() > 1)
+		cemuLog_log(LogType::Force, "[JIT RANGE MAP] entry=0x{:08X} ranges={}",
+			ppcRecFunc->ppcAddress, ppcRecFunc->list_ranges.size());
 
 	
 	return true;

@@ -471,21 +471,30 @@ bool PPCRecompiler_makeRecompiledFunctionActive(uint32 initialEntryPoint, PPCFun
 	// therefore we reset all addresses that are still marked as visited (but not recompiled)
 	// we dont remove the points from the queue but any address thats not marked as visited won't get recompiled
 	// if they are reachable, the interpreter will queue them again
-	if (range.startAddress <= 0x0675FFFFu && (range.startAddress + range.length) >= 0x06750000u)
-		cemuLog_log(LogType::Force, "[MAKE-ACTIVE-CONTAINS-0675] start=0x{:08X} len=0x{:X} end=0x{:08X}", range.startAddress, range.length, range.startAddress + range.length);
 	uint32 resetCount0675 = 0;
-	for (uint32 v = range.startAddress; v <= (range.startAddress + range.length); v += 4)
+	for (const auto& recFuncRange : ppcRecFunc->list_ranges)
 	{
-		auto funcPtr = ppcRecompilerInstanceData->ppcRecompilerDirectJumpTable[v / 4];
-		if (funcPtr == PPCRecompiler_leaveRecompilerCode_visited)
+		const uint32 rangeStart = recFuncRange.ppcAddress;
+		const uint32 rangeEnd = rangeStart + recFuncRange.ppcSize;
+
+		if (rangeStart <= 0x0675FFFFu && rangeEnd > 0x06750000u)
+			cemuLog_log(LogType::Force, "[MAKE-ACTIVE-CONTAINS-0675] start=0x{:08X} len=0x{:X} end=0x{:08X}",
+				rangeStart, recFuncRange.ppcSize, rangeEnd);
+
+		// PPC ranges are half-open: [rangeStart, rangeEnd).
+		for (uint64 v = rangeStart; v < rangeEnd; v += 4)
 		{
-			ppcRecompilerInstanceData->ppcRecompilerDirectJumpTable[v / 4] = PPCRecompiler_leaveRecompilerCode_unvisited;
-			if ((v & 0xFFFF0000u) == 0x06750000u)
-				resetCount0675++;
+			auto funcPtr = ppcRecompilerInstanceData->ppcRecompilerDirectJumpTable[v / 4];
+			if (funcPtr == PPCRecompiler_leaveRecompilerCode_visited)
+			{
+				ppcRecompilerInstanceData->ppcRecompilerDirectJumpTable[v / 4] = PPCRecompiler_leaveRecompilerCode_unvisited;
+				if ((v & 0xFFFF0000u) == 0x06750000u)
+					resetCount0675++;
+			}
 		}
 	}
 	if (resetCount0675 > 0)
-		cemuLog_log(LogType::Force, "[RESET-0675] reset {} entries in range 0x{:08X}-0x{:08X}", resetCount0675, range.startAddress, range.startAddress + range.length);
+		cemuLog_log(LogType::Force, "[RESET-0675] reset {} entries across compiled PPC ranges", resetCount0675);
 
 	// register ranges
 	for (auto& r : ppcRecFunc->list_ranges)
