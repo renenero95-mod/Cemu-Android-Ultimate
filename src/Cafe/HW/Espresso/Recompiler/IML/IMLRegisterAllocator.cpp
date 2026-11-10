@@ -1111,7 +1111,7 @@ void IMLRA_FilterReservedFixedRegisterRequirementsForCluster(IMLRegisterAllocato
 	IMLRA_FilterReservedFixedRegisterRequirementsForSegment(ctx, currentRange, candidatePhysRegSet);
 }
 
-bool IMLRA_AssignSegmentRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenContext_t* ppcImlGenContext, IMLSegment* imlSegment)
+bool IMLRA_AssignSegmentRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenContext_t* ppcImlGenContext, IMLSegment* imlSegment, size_t* strategyCounts)
 {
 	// sort subranges ascending by start index
 	_sortSegmentAllSubrangesLinkedList(imlSegment);
@@ -1231,10 +1231,18 @@ bool IMLRA_AssignSegmentRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenCon
 		// choose strategy
 		if (selectedStrategy)
 		{
+			if (strategyCounts)
+			{
+				if (selectedStrategy == &strategy.localRangeHoleCutting) ++strategyCounts[0];
+				else if (selectedStrategy == &strategy.availableRegisterHole) ++strategyCounts[1];
+				else if (selectedStrategy == &strategy.explodeRange) ++strategyCounts[2];
+				else if (selectedStrategy == &strategy.explodeRangeInter) ++strategyCounts[3];
+			}
 			selectedStrategy->Apply(ppcImlGenContext, imlSegment, subrangeItr);
 		}
 		else
 		{
+			if (strategyCounts) ++strategyCounts[4];
 			// none of the evulated strategies can be applied, this should only happen if the segment extends into the next segment(s) for which we have no good strategy
 			cemu_assert_debug(subrangeItr->interval.ExtendsPreviousSegment());
 			// alternative strategy if we have no other choice: explode current range
@@ -1248,6 +1256,8 @@ bool IMLRA_AssignSegmentRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenCon
 void IMLRA_AssignRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenContext_t* ppcImlGenContext)
 {
 	// Diagnostic-only counters. These observe allocator restarts without changing decisions.
+	const bool traceStrategies = ppcImlGenContext->debug_entryPPCAddress == 0x05BBECA0 || ppcImlGenContext->debug_entryPPCAddress == 0x0596BE6C;
+	size_t strategyCounts[5] = {};
 	size_t assignPasses = 0;
 	size_t assignRetries = 0;
 	size_t totalInstructions = 0;
@@ -1297,7 +1307,7 @@ void IMLRA_AssignRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenContext_t*
 			{
 				if (segIt->loopDepth != d)
 					continue;
-				done = IMLRA_AssignSegmentRegisters(ctx, ppcImlGenContext, segIt);
+				done = IMLRA_AssignSegmentRegisters(ctx, ppcImlGenContext, segIt, traceStrategies ? strategyCounts : nullptr);
 				if (done == false)
 				{
 					++assignRetries;
@@ -1322,6 +1332,14 @@ void IMLRA_AssignRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenContext_t*
 			maxSegmentInstructions,
 			assignPasses,
 			assignRetries);
+	}
+
+	if (traceStrategies && assignRetries > 0)
+	{
+		cemuLog_log(LogType::Force,
+			"[REGALLOC STRATEGY] pc=0x{:08X} local_hole={} available_hole={} explode={} explode_inter={} fallback={}",
+			ppcImlGenContext->debug_entryPPCAddress,
+			strategyCounts[0], strategyCounts[1], strategyCounts[2], strategyCounts[3], strategyCounts[4]);
 	}
 }
 
