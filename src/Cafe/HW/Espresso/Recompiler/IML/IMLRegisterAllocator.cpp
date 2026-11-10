@@ -893,6 +893,14 @@ class RASpillStrategy_AvailableRegisterHole : public RASpillStrategy
 	{
 		cemu_assert_debug(strategyCost != INT_MAX);
 		raInstructionEdge currentRangeStart = currentRange->interval.start;
+		// Diagnostic only: does not change strategy selection or split behavior.
+		if (ctx && (ctx->debug_entryPPCAddress == 0x05BBECA0 || ctx->debug_entryPPCAddress == 0x0596BE6C))
+		{
+		    cemuLog_log(LogType::Force, "[REGALLOC HOLE PICK] pc=0x{:08X} vreg={} start={} split={} phys={} distance={} cost={}",
+		        ctx->debug_entryPPCAddress, currentRange->GetVirtualRegister(),
+		        currentRangeStart.GetRaw(), (currentRangeStart + availableRegisterHole.distance).GetRaw(),
+		        availableRegisterHole.physRegister, availableRegisterHole.distance, strategyCost);
+		}
 		// use available register
 		raLivenessRange* tailRange = IMLRA_SplitRange(nullptr, currentRange, currentRangeStart + availableRegisterHole.distance, true);
 		if (tailRange)
@@ -1188,7 +1196,16 @@ bool IMLRA_AssignSegmentRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenCon
 		if (candidatePhysRegSet.HasAnyAvailable())
 		{
 			// use free register
-			subrangeItr->SetPhysicalRegisterForCluster(candidatePhysRegSet.GetFirstAvailableReg());
+			const sint32 assignedPhysReg = candidatePhysRegSet.GetFirstAvailableReg();
+			if (ppcImlGenContext &&
+			    (ppcImlGenContext->debug_entryPPCAddress == 0x05BBECA0 ||
+			     ppcImlGenContext->debug_entryPPCAddress == 0x0596BE6C))
+			{
+			    cemuLog_log(LogType::Force, "[REGALLOC ASSIGN] pc=0x{:08X} vreg={} start={} phys={}",
+			        ppcImlGenContext->debug_entryPPCAddress,
+			        subrangeItr->GetVirtualRegister(), subrangeItr->interval.start.GetRaw(), assignedPhysReg);
+			}
+			subrangeItr->SetPhysicalRegisterForCluster(assignedPhysReg);
 			livenessTimeline.AddActiveRange(subrangeItr);
 			subrangeItr = subrangeItr->link_allSegmentRanges.next; // next
 			continue;
