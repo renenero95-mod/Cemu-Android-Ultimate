@@ -1180,11 +1180,37 @@ bool IMLRA_AssignSegmentRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenCon
 			candidatePhysRegSet.SetReserved(liverangeItr->GetPhysicalRegister());
 		}
 		// check intersections with other ranges and determine allowed registers
-		IMLPhysRegisterSet localAvailableRegsMask = candidatePhysRegSet; // mask of registers that are currently not used (does not include range checks in other segments)
+
+            // Diagnostic only: dump available physical registers at each allocator filter stage.
+            auto logRegallocMask = [&](const char* stage, const IMLPhysRegisterSet& mask)
+            {
+                if (ppcImlGenContext &&
+                    (ppcImlGenContext->debug_entryPPCAddress == 0x05BBECA0 ||
+                     ppcImlGenContext->debug_entryPPCAddress == 0x0596BE6C))
+                {
+                    cemuLog_log(LogType::Force, "[REGALLOC MASK] pc=0x{:08X} stage={} vreg={} start={}",
+                        ppcImlGenContext->debug_entryPPCAddress, stage,
+                        subrangeItr->GetVirtualRegister(), subrangeItr->interval.start.GetRaw());
+                    sint32 maskReg = -1;
+                    while (true)
+                    {
+                        maskReg = mask.GetNextAvailableReg(maskReg + 1);
+                        if (maskReg < 0)
+                            break;
+                        cemuLog_log(LogType::Force, "[REGALLOC MASK REG] pc=0x{:08X} stage={} vreg={} reg={}",
+                            ppcImlGenContext->debug_entryPPCAddress, stage,
+                            subrangeItr->GetVirtualRegister(), maskReg);
+                    }
+                }
+            };
+
+            IMLPhysRegisterSet localAvailableRegsMask = candidatePhysRegSet;
+            logRegallocMask("LOCAL", localAvailableRegsMask); // mask of registers that are currently not used (does not include range checks in other segments)
 		if (candidatePhysRegSet.HasAnyAvailable())
 		{
 			// check for overlaps on a global scale (subrangeItr can be part of a larger range cluster across multiple segments)
 			PPCRecRA_MaskOverlappingPhysRegForGlobalRange(subrangeItr, candidatePhysRegSet);
+                logRegallocMask("GLOBAL", candidatePhysRegSet);
 		}
 		// some target instructions may enforce specific registers (e.g. common on X86 where something like SHL <reg>, CL forces CL as the count register)
 		// we determine the list of allowed registers here
@@ -1192,6 +1218,7 @@ bool IMLRA_AssignSegmentRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenCon
 		if (candidatePhysRegSet.HasAnyAvailable())
 		{
 			IMLRA_FilterReservedFixedRegisterRequirementsForCluster(ctx, imlSegment, subrangeItr, candidatePhysRegSet);
+                logRegallocMask("FIXED", candidatePhysRegSet);
 		}
 		if (candidatePhysRegSet.HasAnyAvailable())
 		{
@@ -1655,7 +1682,8 @@ void _IMLRA_checkAndTryExtendRange(IMLRegisterAllocatorContext& ctx, IMLSegment*
 {
 	if (routeDepth >= 64)
 	{
-		cemuLog_logDebug(LogType::Force, "Recompiler RA route maximum depth exceeded\n");
+		cemuLog_logDebug(LogType::Force, "Recompiler RA route maximum depth exceeded
+");
 		return;
 	}
 	route[routeDepth] = currentSegment;
