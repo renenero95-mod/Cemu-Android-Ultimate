@@ -430,7 +430,7 @@ struct IMLRALivenessTimeline
 };
 
 // mark occupied registers by any overlapping range as unavailable in physRegSet
-void PPCRecRA_MaskOverlappingPhysRegForGlobalRange(raLivenessRange* range2, IMLPhysRegisterSet& physRegSet)
+void PPCRecRA_MaskOverlappingPhysRegForGlobalRange(ppcImlGenContext_t* ppcImlGenContext, raLivenessRange* range2, IMLPhysRegisterSet& physRegSet)
 {
 	auto clusterRanges = range2->GetAllSubrangesInCluster();
 	for (auto& subrange : clusterRanges)
@@ -447,7 +447,27 @@ void PPCRecRA_MaskOverlappingPhysRegForGlobalRange(raLivenessRange* range2, IMLP
 			}
 			if (subrange->interval.IsOverlapping(subrangeItr->interval))
 			{
-				if (subrangeItr->GetPhysicalRegister() >= 0)
+				const sint32 blockerPhys = subrangeItr->GetPhysicalRegister();
+				if (blockerPhys >= 0)
+				{
+					physRegSet.SetReserved(blockerPhys);
+					if (ppcImlGenContext &&
+					    ppcImlGenContext->debug_entryPPCAddress == 0x05BBECA0 &&
+					    range2->GetVirtualRegister() == 69 && blockerPhys == 26)
+					{
+						cemuLog_log(LogType::Force,
+						    "[REGALLOC GLOBAL BLOCKER] pc=0x{:08X} current_vreg={} current_seg={} current_start={} current_end={} blocker_vreg={} blocker_seg={} blocker_start={} blocker_end={} phys={}",
+						    ppcImlGenContext->debug_entryPPCAddress,
+						    range2->GetVirtualRegister(),
+						    subrange->imlSegment->momentaryIndex,
+						    subrange->interval.start.GetRaw(),
+						    subrange->interval.end.GetRaw(),
+						    subrangeItr->GetVirtualRegister(),
+						    imlSegment->momentaryIndex,
+						    subrangeItr->interval.start.GetRaw(),
+						    subrangeItr->interval.end.GetRaw(), blockerPhys);
+					}
+				}
 					physRegSet.SetReserved(subrangeItr->GetPhysicalRegister());
 			}
 			// next
@@ -1209,7 +1229,7 @@ bool IMLRA_AssignSegmentRegisters(IMLRegisterAllocatorContext& ctx, ppcImlGenCon
 		if (candidatePhysRegSet.HasAnyAvailable())
 		{
 			// check for overlaps on a global scale (subrangeItr can be part of a larger range cluster across multiple segments)
-			PPCRecRA_MaskOverlappingPhysRegForGlobalRange(subrangeItr, candidatePhysRegSet);
+			PPCRecRA_MaskOverlappingPhysRegForGlobalRange(ppcImlGenContext, subrangeItr, candidatePhysRegSet);
                 logRegallocMask("GLOBAL", candidatePhysRegSet);
 		}
 		// some target instructions may enforce specific registers (e.g. common on X86 where something like SHL <reg>, CL forces CL as the count register)
