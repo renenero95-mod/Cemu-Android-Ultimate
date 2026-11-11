@@ -468,7 +468,6 @@ void PPCRecRA_MaskOverlappingPhysRegForGlobalRange(ppcImlGenContext_t* ppcImlGen
 						    subrangeItr->interval.end.GetRaw(), blockerPhys);
 					}
 				}
-					physRegSet.SetReserved(subrangeItr->GetPhysicalRegister());
 			}
 			// next
 			subrangeItr = subrangeItr->link_allSegmentRanges.next;
