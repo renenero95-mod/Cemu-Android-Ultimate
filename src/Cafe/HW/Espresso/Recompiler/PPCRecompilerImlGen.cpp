@@ -2999,7 +2999,7 @@ bool PPCIMLGen_FillBasicBlock(ppcImlGenContext_t& ppcImlGenContext, PPCBasicBloc
 			const uint32 rawOpcode = *(ppcImlGenContext.currentInstruction - 1);
 			const uint32 opcode = CPU_swapEndianU32(rawOpcode);
 			const uint32 primary = (opcode >> 26) & 0x3F;
-			cemuLog_log(LogType::Force, "[PPCREC UNSUPPORTED] PC=0x{:08X} RAW=0x{:08X} OPCODE=0x{:08X} PRIMARY={}", addressOfCurrentInstruction, rawOpcode, opcode, primary);
+			cemuLog_log(LogType::Recompiler, "[PPCREC UNSUPPORTED] PC=0x{:08X} RAW=0x{:08X} OPCODE=0x{:08X} PRIMARY={}", addressOfCurrentInstruction, rawOpcode, opcode, primary);
 			ppcImlGenContext.currentOutputSegment = nullptr;
 			return false;
 		}

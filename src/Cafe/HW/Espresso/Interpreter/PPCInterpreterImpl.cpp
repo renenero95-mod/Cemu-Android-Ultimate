@@ -72,38 +72,6 @@ public:
 	inline static uint32 ppcMem_readDataU32(PPCInterpreter_t* hCPU, uint32 address)
 	{
 		void* ptr = memory_getPointerFromVirtualOffset(address);
-		const uint32 ip = hCPU->instructionPointer;
-
-		// The previous crash repeatedly occurred at this Watch Dogs instruction.
-		// Log its effective address and translated host pointer before dereferencing.
-		if (ip == 0x04e49e34 || ptr == nullptr)
-		{
-			cemuLog_log(LogType::Force,
-				"[PPC LWZ DIAG BUILD] PPCInterpreterImpl.cpp compiled with EA/IP/LR/RT/RA logger");
-			uint32 instruction = 0;
-			if (ip != 0)
-				instruction = memory_readCodeU32(hCPU, ip);
-
-			const uint32 opcode = instruction >> 26;
-			const uint32 rt = (instruction >> 21) & 0x1F;
-			const uint32 ra = (instruction >> 16) & 0x1F;
-			const sint16 displacement = (sint16)(instruction & 0xFFFF);
-
-			cemuLog_log(LogType::Force,
-				"[PPC LWZ DIAG] EA=0x{:08x} hostPtr=0x{:016x} "
-				"IP=0x{:08x} LR_RA=0x{:08x} instruction=0x{:08x} "
-				"opcode={} RT=r{} RA=r{} displacement={}",
-				address,
-				(uint64)ptr,
-				ip,
-				(uint32)hCPU->spr.LR,
-				instruction,
-				opcode,
-				rt,
-				ra,
-				displacement);
-		}
-
 		uint32 v = *(uint32*)ptr;
 		return CPU_swapEndianU32(v);
 	}
